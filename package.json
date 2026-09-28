@@ -1,0 +1,21 @@
+{
+  "name": "ox-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for OX System integration",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "multer": "^2.4.0",
+    "pg": "^8.11.3",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
