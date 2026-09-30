@@ -22,7 +22,7 @@ async function getSale(saleId) {
     params: { 'id[]': saleId }
   })
 
-  return responce.data || null;
+  return responce.data.items[0] || null;
 }
 
 async function getCustomer(customerId) {
@@ -30,11 +30,24 @@ async function getCustomer(customerId) {
     params: { 'id[]': customerId }
   })
 
-  console.log("responce ",responce);
-  console.log("responce.data", responce.data);
-  
+  const costumer = {
+    fullName: responce.data.items[0].profile.fullName,
+    firstName: responce.data.items[0].profile.firstName,
+    lastName: responce.data.items[0].profile.lastName,
+    id: responce.data.items[0].profile.id,
+    middleName: responce.data.items[0].profile?.middleName,
+    phoneNumbers: responce.data.items[0].profile?.phoneNumbers,
+    birthDate: responce.data.items[0].profile?.birthDate,
+    gender: responce.data.items[0].profile?.gender,
+    photos: responce.data.items[0].profile?.photos,
+    customerId: responce.data.items[0].id,
+    email: responce.data.items[0]?.email,
+    cards: responce.data.items[0]?.cards,
+    walletTotalCash: responce.data.items[0].wallet.totalCash,
+    region: responce.data.items[0].fieldGroups[0].fields[0].value,
+  }
 
-  return responce.data
+  return costumer
 }
 
 // Получить список заказов клиента

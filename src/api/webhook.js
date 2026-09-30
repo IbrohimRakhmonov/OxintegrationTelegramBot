@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { findUserByOxId } = require('../services/userService');
 const { getSale, getCustomer } = require('../services/oxApi');
+const bot = require('../bot/index')
 
 // Этот endpoint нужно указать в настройках Webhook в OX System
 // Настройки → Webhooks → URL: http://ВАШ_СЕРВЕР:3000/webhook/ox
@@ -14,87 +15,54 @@ router.post('/ox', async (req, res) => {
   // Отвечаем OX сразу, чтобы он не повторял запрос
   res.status(200).json({ received: true, event });
 
-
-
+  try {
   await handleOxEvent(event);
-  
+} catch (err) {
+  console.error('Webhook handler error:', err.message);
+}
 });
 
 
-// const msg =
-//         `🛒 *Новый заказ оформлен!*\n\n` +
-//         `📦 Заказ #${order.id}\n` +
-//         `💵 Сумма: ${formatAmount(order.total)}\n` +
-//         `📍 Статус: ⏳ Ожидает обработки\n\n` +
-//         `Мы уведомим вас при изменении статуса.`;
-
-
-
 async function handleOxEvent(event) {
-  const bot = require('../bot');
-
   const sale = await getSale(event.id);
-    console.log(sale);
-    console.log("SALE ", sale);
-    
+  console.log("🛒💵New SALE ", sale);
 
+  let customer = {}
   
-  const customer = await getCustomer(sale.customer)
-  console.log('🔎 Customer from OX:', customer);
+  if (!sale?.customer) {
+    console.log("❌ Customer is not attached");
+    return
+  } else {
+    customer = await getCustomer(sale.customer)
+    console.log('🔎 Customer from OX:', customer);
+  }
 
+  const productData = await getProdu
 
-  // switch (event.type) {
+  const user = await findUserByOxId(sale.customer)
+  if(!user){
+    console.log(`ℹ️ Клиент ${sale.customer} не привязал Telegram`);
+    return;
+  }
 
-  //   // Новый заказ / покупка
-  //   case 'completed': {
-  //     const order = event.data;
-  //     const user = await findUserByOxId(order.customer_id);
-  //     if (!user) return;
+  if(sale.sellRecords.length > 1){
+    const productList = sale.sellRecords
+    .map((r, i) => {
+      const name = r.variationName || 'Без Называния';
+      const qty = r.count || 1;
+      const price = r.total.UZS; 
+      const idProduct = r.id;
+    })
+  }
 
+  const msg =
+    `🛒 *Новый заказ оформлен!*\n\n` +
+    `📦 Заказ #${sale.id}\n` +
+    `💵 Сумма: ${formatAmount(sale.sellRecords[0].total.UZS)}\n` +
+    `📍 Статус: ⏳ Ожидает обработки\n\n` +
+    `📍 Продукт: ${sale.sellRecords[1].variationName}\n\n` +
 
-
-  //     await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'Markdown' });
-  //     break;
-  //   }
-
-  //   // Изменение статуса заказа
-  //   case 'order.status_changed': {
-  //     const order = event.data;
-  //     const user = await findUserByOxId(order.customer_id);
-  //     if (!user) return;
-
-  //     const statusMessages = {
-  //       processing: `🔄 *Заказ #${order.id} в обработке*\n\nВаш заказ принят и передан в работу.`,
-  //       shipped: `🚚 *Заказ #${order.id} отправлен!*\n\nВаш заказ в пути. Ожидайте доставку.`,
-  //       completed: `✅ *Заказ #${order.id} выполнен!*\n\nСпасибо за покупку!\n💰 Кешбек начислен на ваш счёт.`,
-  //       cancelled: `❌ *Заказ #${order.id} отменён*\n\nПо вопросам обращайтесь в поддержку.`,
-  //     };
-
-  //     const msg = statusMessages[order.status];
-  //     if (msg) {
-  //       await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'Markdown' });
-  //     }
-  //     break;
-  //   }
-
-  //   // Начисление кешбека
-  //   case 'cashback.credited': {
-  //     const data = event.data;
-  //     const user = await findUserByOxId(data.customer_id);
-  //     if (!user) return;
-
-  //     const msg =
-  //       `💰 *Кешбек начислен!*\n\n` +
-  //       `+${formatAmount(data.amount)}\n` +
-  //       `Текущий баланс: ${formatAmount(data.balance)}`;
-
-  //     await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'Markdown' });
-  //     break;
-  //   }
-
-  //   default:
-  //     console.log(`Unhandled event id: ${event.id}`);
-  // }
+  await bot.telegram.sendMessage(user.telegram_id, msg, {parse_mode: 'Markdown'})
 }
 
 function formatAmount(amount) {
