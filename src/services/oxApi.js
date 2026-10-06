@@ -1,4 +1,6 @@
 const axios = require('axios');
+const PAGE_SIZE = 100;
+const MAX_PAGES = 20;
 
 const oxClient = axios.create({
   baseURL: process.env.OX_API_URL || 'https://sparfume.ox-sys.com',
@@ -47,13 +49,37 @@ async function getCustomer(customerId) {
     region: responce.data.items[0].fieldGroups[0].fields[0].value,
   }
 
-  return costumer
+  return costumer || {};
 }
 
 // Получить список заказов клиента
 async function getCustomerOrders(oxUserId) {
-  const response = await oxClient.get(`/customers/${oxUserId}/orders`);
-  return response.data?.data || [];
+  const allItems = [];
+  let page = 1;
+  let totalCount = 0;
+
+  do {
+    const response = await oxClient.get('/sells-list', {
+      params: {
+        'customer[0]': oxUserId,          // ← ключ из вашего рабочего запроса
+        size: PAGE_SIZE,
+        page,
+        sort: 'finishedTime desc',
+      },
+    });
+
+    const items = response.data?.items ?? [];
+    totalCount = response.data?.totalCount ?? 0;
+    allItems.push(...items);
+
+    if (items.length < PAGE_SIZE) break; // последняя страница
+    page++;
+  } while (allItems.length < totalCount && page <= MAX_PAGES);
+
+  // страховка: если фильтр по клиенту не сработал, не покажем чужие чеки
+  const items = allItems.filter((o) => o.customer === Number(oxUserId));
+
+  return { items, totalCount: items.length };
 }
 
 // Получить баланс кешбека клиента

@@ -1,6 +1,7 @@
 const { Telegraf, Markup } = require('telegraf');
 const { findUserByTelegramId, createUser, authorizeUser } = require('../services/userService');
 const { findCustomerByPhone, getCustomerOrders, getCashbackBalance } = require('../services/oxApi');
+const { buildOrderMessages } = require('./formatOrder');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -91,15 +92,17 @@ bot.action('my_orders', async (ctx) => {
   }
 
   try {
-    const orders = await getCustomerOrders(user.ox_user_id);
+    const responce = await getCustomerOrders(user.ox_user_id);
+    const message = buildOrderMessages(responce, {limit : 9});
 
-    if (!orders.length) {
-      return ctx.reply('📦 У вас пока нет покупок.', mainMenu());
+    for(let i = 0; i < message.length; i++){
+      const isLast = i === message.length - 1;
+      await ctx.reply(message[i], {
+        parse_mode: 'HTML',
+        ...(isLast ? mainMenu() : {}), // кнопки меню только под последним сообщением
+      })
     }
 
-    const list = orders.slice(0, 5).map((o, i) =>
-      `${i + 1}. #${o.id} — ${formatAmount(o.total)} — ${formatStatus(o.status)}`
-    ).join('\n');
 
     ctx.reply(`🛒 *Ваши последние покупки:*\n\n${list}`, {
       parse_mode: 'Markdown',

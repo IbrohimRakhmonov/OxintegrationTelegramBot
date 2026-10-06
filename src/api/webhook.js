@@ -16,10 +16,10 @@ router.post('/ox', async (req, res) => {
   res.status(200).json({ received: true, event });
 
   try {
-  await handleOxEvent(event);
-} catch (err) {
-  console.error('Webhook handler error:', err.message);
-}
+    await handleOxEvent(event);
+  } catch (err) {
+    console.error('Webhook handler error:', err.message);
+  }
 });
 
 
@@ -28,7 +28,7 @@ async function handleOxEvent(event) {
   console.log("🛒💵New SALE ", sale);
 
   let customer = {}
-  
+
   if (!sale?.customer) {
     console.log("❌ Customer is not attached");
     return
@@ -40,19 +40,19 @@ async function handleOxEvent(event) {
   const productData = await getProdu
 
   const user = await findUserByOxId(sale.customer)
-  if(!user){
+  if (!user) {
     console.log(`ℹ️ Клиент ${sale.customer} не привязал Telegram`);
     return;
   }
 
-  if(sale.sellRecords.length > 1){
+  if (sale.sellRecords.length > 1) {
     const productList = sale.sellRecords
-    .map((r, i) => {
-      const name = r.variationName || 'Без Называния';
-      const qty = r.count || 1;
-      const price = r.total.UZS; 
-      const idProduct = r.id;
-    })
+      .map((r, i) => {
+        const name = r.variationName || 'Без Называния';
+        const qty = r.count || 1;
+        const price = r.total.UZS;
+        const idProduct = r.id;
+      })
   }
 
   const msg =
@@ -62,7 +62,7 @@ async function handleOxEvent(event) {
     `📍 Статус: ⏳ Ожидает обработки\n\n` +
     `📍 Продукт: ${sale.sellRecords[1].variationName}\n\n` +
 
-  await bot.telegram.sendMessage(user.telegram_id, msg, {parse_mode: 'Markdown'})
+    await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'Markdown' })
 }
 
 function formatAmount(amount) {

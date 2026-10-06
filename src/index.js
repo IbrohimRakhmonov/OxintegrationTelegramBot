@@ -30,7 +30,7 @@ async function start() {
     });
     
     // 3. Запускаем Telegram бота (long polling для локальной разработки)
-    await bot.launch();
+    bot.launch();
     console.log('🤖 Telegram bot started');
 
     // Graceful shutdown
