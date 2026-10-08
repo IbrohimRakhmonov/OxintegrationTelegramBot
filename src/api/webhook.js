@@ -37,36 +37,43 @@ async function handleOxEvent(event) {
     console.log('🔎 Customer from OX:', customer);
   }
 
-  const productData = await getProdu
-
   const user = await findUserByOxId(sale.customer)
   if (!user) {
     console.log(`ℹ️ Клиент ${sale.customer} не привязал Telegram`);
     return;
   }
 
-  if (sale.sellRecords.length > 1) {
-    const productList = sale.sellRecords
-      .map((r, i) => {
-        const name = r.variationName || 'Без Называния';
-        const qty = r.count || 1;
-        const price = r.total.UZS;
-        const idProduct = r.id;
-      })
-  }
+  const records = sale.sellRecords || [];
+  const productList = records
+    .map((r, i) => {
+      const name = escapeHtml(r.variationName || 'Без названия');
+      const qty = r.count || 1;
+      const price = r.total?.UZS ?? 0;
+      return `${i + 1}. ${name} × ${qty} — ${formatAmount(price)}`;
+    })
+    .join('\n');
+
+  const total =
+    sale.sellTotal?.UZS ??
+    records.reduce((sum, r) => sum + Number(r.total?.UZS ?? 0), 0);
 
   const msg =
-    `🛒 *Новый заказ оформлен!*\n\n` +
+    `🛒 <b>Новый заказ оформлен!</b>\n\n` +
     `📦 Заказ #${sale.id}\n` +
-    `💵 Сумма: ${formatAmount(sale.sellRecords[0].total.UZS)}\n` +
+    `💵 Сумма: ${formatAmount(total)}\n` +
     `📍 Статус: ⏳ Ожидает обработки\n\n` +
-    `📍 Продукт: ${sale.sellRecords[1].variationName}\n\n` +
+    `🧴 Товары:\n${productList || '—'}`;
 
-    await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'Markdown' })
+  await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'HTML' });
+  console.log(`✅ Уведомление о заказе #${sale.id} отправлено клиенту ${sale.customer}`);
 }
 
 function formatAmount(amount) {
   return new Intl.NumberFormat('ru-RU').format(amount) + ' UZS';
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 module.exports = router;

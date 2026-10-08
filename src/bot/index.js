@@ -103,11 +103,6 @@ bot.action('my_orders', async (ctx) => {
       })
     }
 
-
-    ctx.reply(`🛒 *Ваши последние покупки:*\n\n${list}`, {
-      parse_mode: 'Markdown',
-      ...mainMenu(),
-    });
   } catch (err) {
     console.error('Orders error:', err.message);
     ctx.reply('⚠️ Не удалось загрузить покупки. Попробуйте позже.');

@@ -1,9 +1,7 @@
 const TG_LIMIT = 4096;
 const PAYMENT_METHODS = { 1: 'Наличные', 2: "UzCard", 3: 'Humo' };
 
-const money = (value = 0) => {
-    `${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
-};
+const money = (value = 0) => `${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`;
 
 const formatDate = (str) => {
     if (!str) return '-';

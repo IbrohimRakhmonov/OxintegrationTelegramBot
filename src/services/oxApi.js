@@ -32,24 +32,28 @@ async function getCustomer(customerId) {
     params: { 'id[]': customerId }
   })
 
+  const item = responce.data?.items?.[0];
+  if (!item) return null;
+
+  // У части клиентов нет wallet / fieldGroups — поэтому везде ?.
   const costumer = {
-    fullName: responce.data.items[0].profile.fullName,
-    firstName: responce.data.items[0].profile.firstName,
-    lastName: responce.data.items[0].profile.lastName,
-    id: responce.data.items[0].profile.id,
-    middleName: responce.data.items[0].profile?.middleName,
-    phoneNumbers: responce.data.items[0].profile?.phoneNumbers,
-    birthDate: responce.data.items[0].profile?.birthDate,
-    gender: responce.data.items[0].profile?.gender,
-    photos: responce.data.items[0].profile?.photos,
-    customerId: responce.data.items[0].id,
-    email: responce.data.items[0]?.email,
-    cards: responce.data.items[0]?.cards,
-    walletTotalCash: responce.data.items[0].wallet.totalCash,
-    region: responce.data.items[0].fieldGroups[0].fields[0].value,
+    fullName: item.profile?.fullName,
+    firstName: item.profile?.firstName,
+    lastName: item.profile?.lastName,
+    id: item.profile?.id,
+    middleName: item.profile?.middleName,
+    phoneNumbers: item.profile?.phoneNumbers,
+    birthDate: item.profile?.birthDate,
+    gender: item.profile?.gender,
+    photos: item.profile?.photos,
+    customerId: item.id,
+    email: item.email,
+    cards: item.cards,
+    walletTotalCash: item.wallet?.totalCash ?? 0,
+    region: item.fieldGroups?.[0]?.fields?.[0]?.value ?? null,
   }
 
-  return costumer || {};
+  return costumer;
 }
 
 // Получить список заказов клиента
