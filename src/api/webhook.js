@@ -16,10 +16,10 @@ router.post('/ox', async (req, res) => {
   res.status(200).json({ received: true, event });
 
   try {
-  await handleOxEvent(event);
-} catch (err) {
-  console.error('Webhook handler error:', err.message);
-}
+    await handleOxEvent(event);
+  } catch (err) {
+    console.error('Webhook handler error:', err.message);
+  }
 });
 
 
@@ -28,7 +28,7 @@ async function handleOxEvent(event) {
   console.log("🛒💵New SALE ", sale);
 
   let customer = {}
-  
+
   if (!sale?.customer) {
     console.log("❌ Customer is not attached");
     return
@@ -40,33 +40,42 @@ async function handleOxEvent(event) {
   const productData = await getProduct(sale.sellRecords[0].variationBarcode);
 
   const user = await findUserByOxId(sale.customer)
-  if(!user){
+  if (!user) {
     console.log(`ℹ️ Клиент ${sale.customer} не привязал Telegram`);
     return;
   }
 
-  if(sale.sellRecords.length > 1){
-    const productList = sale.sellRecords
+  const records = sale.sellRecords || [];
+  const productList = records
     .map((r, i) => {
-      const name = r.variationName || 'Без Называния';
+      const name = escapeHtml(r.variationName || 'Без названия');
       const qty = r.count || 1;
-      const price = r.total.UZS; 
-      const idProduct = r.id;
+      const price = r.total?.UZS ?? 0;
+      return `${i + 1}. ${name} × ${qty} — ${formatAmount(price)}`;
     })
-  }
+    .join('\n');
+
+  const total =
+    sale.sellTotal?.UZS ??
+    records.reduce((sum, r) => sum + Number(r.total?.UZS ?? 0), 0);
 
   const msg =
-    `🛒 *Новый заказ оформлен!*\n\n` +
+    `🛒 <b>Новый заказ оформлен!</b>\n\n` +
     `📦 Заказ #${sale.id}\n` +
-    `💵 Сумма: ${formatAmount(sale.sellRecords[0].total.UZS)}\n` +
+    `💵 Сумма: ${formatAmount(total)}\n` +
     `📍 Статус: ⏳ Ожидает обработки\n\n` +
-    `📍 Продукт: ${sale.sellRecords[1].variationName}\n\n` +
+    `🧴 Товары:\n${productList || '—'}`;
 
-  await bot.telegram.sendMessage(user.telegram_id, msg, {parse_mode: 'Markdown'})
+  await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'HTML' });
+  console.log(`✅ Уведомление о заказе #${sale.id} отправлено клиенту ${sale.customer}`);
 }
 
 function formatAmount(amount) {
   return new Intl.NumberFormat('ru-RU').format(amount) + ' UZS';
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 module.exports = router;
