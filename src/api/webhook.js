@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { findUserByOxId } = require('../services/userService');
-const { getSale, getCustomer } = require('../services/oxApi');
+const { getSale, getCustomer, getProduct } = require('../services/oxApi');
 const bot = require('../bot/index')
 
 // Этот endpoint нужно указать в настройках Webhook в OX System
@@ -36,6 +36,8 @@ async function handleOxEvent(event) {
     customer = await getCustomer(sale.customer)
     console.log('🔎 Customer from OX:', customer);
   }
+
+  const productData = await getProduct(sale.sellRecords[0].variationBarcode);
 
   const user = await findUserByOxId(sale.customer)
   if (!user) {

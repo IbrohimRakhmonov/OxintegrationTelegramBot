@@ -56,6 +56,16 @@ async function getCustomer(customerId) {
   return costumer;
 }
 
+const getProduct = async (barCode) => {
+  const responce = await oxClient.get('/variations', {
+    params : {
+      barCode: barCode
+    }
+  })
+
+  return responce
+}
+
 // Получить список заказов клиента
 async function getCustomerOrders(oxUserId) {
   const allItems = [];
@@ -92,4 +102,4 @@ async function getCashbackBalance(oxUserId) {
   return response.data?.data || { balance: 0, currency: 'UZS' };
 }
 
-module.exports = { findCustomerByPhone, getCustomerOrders, getCashbackBalance, getSale, getCustomer };
+module.exports = { findCustomerByPhone, getCustomerOrders, getCashbackBalance, getSale, getCustomer, getProduct };
