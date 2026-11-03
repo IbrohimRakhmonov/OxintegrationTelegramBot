@@ -5,6 +5,13 @@ const { buildOrderMessages } = require('./formatOrder');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
+// Telegraf не берёт новые сообщения, пока не обработает текущие. Если OX отвечает
+// медленно, бот «замирает» для всех и потом отвечает пачкой. Поэтому обработку
+// запускаем в фоне — бот сразу принимает следующие нажатия.
+bot.use((ctx, next) => {
+  next().catch((err) => console.error(`Bot error (${ctx.updateType}):`, err.message));
+});
+
 // ─── /start ───────────────────────────────────────────────────────────────────
 bot.start(async (ctx) => {
   const telegramId = ctx.from.id;
@@ -87,7 +94,7 @@ bot.on('contact', async (ctx) => {
 
 // ─── МОИ ПОКУПКИ ──────────────────────────────────────────────────────────────
 bot.action('my_orders', async (ctx) => {
-  await ctx.answerCbQuery();
+  await ctx.answerCbQuery('⏳ Загружаем покупки…');
   const user = await findUserByTelegramId(ctx.from.id);
 
   if (!user?.is_authorized) {
@@ -114,7 +121,7 @@ bot.action('my_orders', async (ctx) => {
 
 // ─── КЕШБЕК ───────────────────────────────────────────────────────────────────
 bot.action('cashback', async (ctx) => {
-  await ctx.answerCbQuery();
+  await ctx.answerCbQuery('⏳ Загружаем кешбэк…');
   const user = await findUserByTelegramId(ctx.from.id);
 
   if (!user?.is_authorized) {
@@ -154,10 +161,6 @@ bot.action('help', async (ctx) => {
 // Любой другой текст — показываем меню или предлагаем авторизоваться
 bot.on('text', handleText);
 
-// Ошибка в одном обработчике не должна останавливать бота
-bot.catch((err, ctx) => {
-  console.error(`Bot error (${ctx.updateType}):`, err.message);
-});
 
 
 // ─── ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ──────────────────────────────────────────────────
