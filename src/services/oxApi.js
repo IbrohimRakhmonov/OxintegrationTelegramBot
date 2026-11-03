@@ -4,6 +4,7 @@ const MAX_PAGES = 20;
 
 const oxClient = axios.create({
   baseURL: process.env.OX_API_URL || 'https://sparfume.ox-sys.com',
+  timeout: 15000,
   headers: {
     'auth-token': process.env.OX_TOKEN,
     'Content-Type': 'application/json',
