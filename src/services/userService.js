@@ -38,4 +38,13 @@ async function findUserByOxId(oxUserId) {
   return rows[0] || null;
 }
 
-module.exports = { findUserByTelegramId, createUser, authorizeUser, findUserByOxId };
+// true — продажа обрабатывается впервые, false — уже была обработана
+async function markSaleProcessed(saleId) {
+  const { rowCount } = await pool.query(
+    'INSERT INTO processed_sales (sale_id) VALUES ($1) ON CONFLICT DO NOTHING',
+    [saleId]
+  );
+  return rowCount > 0;
+}
+
+module.exports = { findUserByTelegramId, createUser, authorizeUser, findUserByOxId, markSaleProcessed };

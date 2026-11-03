@@ -1,43 +1,57 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
-const { findUserByOxId } = require('../services/userService');
-const { getSale, getCustomer, getProduct } = require('../services/oxApi');
+const { findUserByOxId, markSaleProcessed } = require('../services/userService');
+const { getSale } = require('../services/oxApi');
 const bot = require('../bot/index')
 
-// Этот endpoint нужно указать в настройках Webhook в OX System
-// Настройки → Webhooks → URL: http://ВАШ_СЕРВЕР:3000/webhook/ox
-router.post('/ox', async (req, res) => {
-  console.log('📨 Webhook headers:', req.headers);
-  console.log('📨 Webhook body:', req.body);
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 
-  const event = req.body || {};
+// Сравнение секрета за постоянное время, чтобы его нельзя было подобрать по времени ответа
+function isValidSecret(given = '') {
+  const a = Buffer.from(given);
+  const b = Buffer.from(WEBHOOK_SECRET);
+  return WEBHOOK_SECRET.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// Этот endpoint нужно указать в настройках Webhook в OX System
+// Настройки → Webhooks → URL: https://ВАШ_ДОМЕН/webhook/ox/<WEBHOOK_SECRET>
+router.post('/ox/:secret', async (req, res) => {
+  if (!isValidSecret(req.params.secret)) {
+    return res.sendStatus(404);
+  }
 
   // Отвечаем OX сразу, чтобы он не повторял запрос
-  res.status(200).json({ received: true, event });
+  res.status(200).json({ received: true });
+
+  const saleId = Number(req.body?.id);
+  if (!Number.isInteger(saleId) || saleId <= 0) {
+    console.log('⚠️ Webhook без корректного id продажи');
+    return;
+  }
 
   try {
-    await handleOxEvent(event);
+    // Каждую продажу обрабатываем один раз — повторы от OX не дублируют уведомления
+    const isNew = await markSaleProcessed(saleId);
+    if (!isNew) {
+      console.log(`ℹ️ Продажа #${saleId} уже обработана`);
+      return;
+    }
+
+    await handleOxEvent(saleId);
   } catch (err) {
     console.error('Webhook handler error:', err.message);
   }
 });
 
 
-async function handleOxEvent(event) {
-  const sale = await getSale(event.id);
-  console.log("🛒💵New SALE ", sale);
-
-  let customer = {}
+async function handleOxEvent(saleId) {
+  const sale = await getSale(saleId);
 
   if (!sale?.customer) {
-    console.log("❌ Customer is not attached");
-    return
-  } else {
-    customer = await getCustomer(sale.customer)
-    console.log('🔎 Customer from OX:', customer);
+    console.log(`❌ К продаже #${saleId} не привязан клиент`);
+    return;
   }
-
-  const productData = await getProduct(sale.sellRecords[0].variationBarcode);
 
   const user = await findUserByOxId(sale.customer)
   if (!user) {
@@ -45,7 +59,7 @@ async function handleOxEvent(event) {
     return;
   }
 
-  const records = sale.sellRecords || [];
+  const records = (sale.sellRecords || []).filter((r) => !r.deleted);
   const productList = records
     .map((r, i) => {
       const name = escapeHtml(r.variationName || 'Без названия');
@@ -61,9 +75,8 @@ async function handleOxEvent(event) {
 
   const msg =
     `🛒 <b>Новый заказ оформлен!</b>\n\n` +
-    `📦 Заказ #${sale.id}\n` +
-    `💵 Сумма: ${formatAmount(total)}\n` +
-    `📍 Статус: ⏳ Ожидает обработки\n\n` +
+    `📦 Заказ #${sale.printKey || sale.id}\n` +
+    `💵 Сумма: ${formatAmount(total)}\n\n` +
     `🧴 Товары:\n${productList || '—'}`;
 
   await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'HTML' });

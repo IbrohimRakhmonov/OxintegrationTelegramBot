@@ -23,10 +23,12 @@ async function start() {
     await initDB();
     
     // 2. Запускаем Express сервер
-    const PORT = process.env.PORT;
+    const PORT = process.env.PORT || 3000;
     app.listen(PORT, async () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📡 OX Webhook URL: http://localhost:${PORT}/webhook/ox`);
+      if (!process.env.WEBHOOK_SECRET) {
+        console.warn('⚠️ WEBHOOK_SECRET не задан — вебхук OX отключён');
+      }
     });
     
     // 3. Запускаем Telegram бота (long polling для локальной разработки)

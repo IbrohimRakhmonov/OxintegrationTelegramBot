@@ -33,21 +33,24 @@ bot.start(async (ctx) => {
 bot.action('auth_start', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
-    '📱 Введите ваш номер телефона в формате:\n+998901234567',
-    Markup.forceReply()
+    '📱 Нажмите кнопку «Поделиться номером» внизу экрана, чтобы подтвердить ваш номер телефона.',
+    Markup.keyboard([
+      [Markup.button.contactRequest('📱 Поделиться номером')]
+    ]).resize().oneTime()
   );
 });
 
-// Обработка номера телефона
-bot.on('text', async (ctx) => {
+// Обработка контакта: номер принимаем только через кнопку «Поделиться номером»,
+// поэтому чужой номер ввести нельзя
+bot.on('contact', async (ctx) => {
   const telegramId = ctx.from.id;
-  const text = ctx.message.text;
+  const contact = ctx.message.contact;
 
-  // Проверяем что это номер телефона
-  const phoneRegex = /^\+?[0-9]{10,13}$/;
-  if (!phoneRegex.test(text.replace(/\s/g, ''))) {
-    // Это не телефон — обрабатываем как обычный текст
-    return handleText(ctx);
+  if (contact.user_id !== telegramId) {
+    return ctx.reply(
+      '❌ Можно привязать только свой номер. Нажмите кнопку «Поделиться номером».',
+      Markup.inlineKeyboard([[Markup.button.callback('🔄 Попробовать снова', 'auth_start')]])
+    );
   }
 
   const user = await findUserByTelegramId(telegramId);
@@ -55,15 +58,15 @@ bot.on('text', async (ctx) => {
     return ctx.reply('Вы уже авторизованы ✅', mainMenu());
   }
 
-  const phone = text.replace(/\D/g, '');
-  await ctx.reply('🔍 Ищем ваш аккаунт...');
+  const phone = contact.phone_number.replace(/\D/g, '');
+  await ctx.reply('🔍 Ищем ваш аккаунт...', Markup.removeKeyboard());
 
   try {
     const oxCustomer = await findCustomerByPhone(phone);
-    
+
     if (!oxCustomer) {
       return ctx.reply(
-        '❌ Аккаунт с таким номером не найден в OX System.\n\nПроверьте номер и попробуйте снова.',
+        '❌ Аккаунт с вашим номером не найден в OX System.\n\nОбратитесь в магазин, чтобы вас зарегистрировали по этому номеру.',
         Markup.inlineKeyboard([
           [Markup.button.callback('🔄 Попробовать снова', 'auth_start')]
         ])
@@ -73,7 +76,7 @@ bot.on('text', async (ctx) => {
     await authorizeUser(telegramId, oxCustomer.id, phone);
 
     ctx.reply(
-      `✅ Авторизация успешна!\n\n👤 ${oxCustomer.profile.fullName || oxCustomer.phone}\n\nТеперь вы будете получать уведомления о покупках и можете проверять кешбек.`,
+      `✅ Авторизация успешна!\n\n👤 ${oxCustomer.profile?.fullName || '+' + phone}\n\nТеперь вы будете получать уведомления о покупках и можете проверять кешбек.`,
       mainMenu()
     );
   } catch (err) {
@@ -139,11 +142,19 @@ bot.action('help', async (ctx) => {
   ctx.reply(
     '❓ *Помощь*\n\n' +
     '📱 *Авторизация* — привяжите ваш номер телефона\n' +
-    '🛒 *Мои покупки* — последние 5 заказов\n' +
+    '🛒 *Мои покупки* — сводка и последние 9 заказов\n' +
     '💰 *Кешбек* — текущий баланс бонусов\n\n' +
     'По вопросам обращайтесь в поддержку магазина.',
     { parse_mode: 'Markdown', ...mainMenu() }
   );
+});
+
+// Любой другой текст — показываем меню или предлагаем авторизоваться
+bot.on('text', handleText);
+
+// Ошибка в одном обработчике не должна останавливать бота
+bot.catch((err, ctx) => {
+  console.error(`Bot error (${ctx.updateType}):`, err.message);
 });
 
 
@@ -157,16 +168,6 @@ function mainMenu() {
 
 function formatAmount(amount) {
   return new Intl.NumberFormat('ru-RU').format(amount) + ' UZS';
-}
-
-function formatStatus(status) {
-  const statuses = {
-    pending: '⏳ Ожидает',
-    processing: '🔄 В обработке',
-    completed: '✅ Выполнен',
-    cancelled: '❌ Отменён',
-  };
-  return statuses[status] || status;
 }
 
 async function handleText(ctx) {
