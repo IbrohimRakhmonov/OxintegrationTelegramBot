@@ -21,6 +21,11 @@ async function initDB() {
         is_authorized BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS processed_sales (
+        sale_id BIGINT PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
     `);
     console.log('✅ Database initialized');
   } finally {

@@ -76,7 +76,7 @@ function buildSummary(orders) {
         }, {})
     )
         .sort((a, b) => b[1] - a[1])
-        .slice(0, itemCount);
+        .slice(0, 5);
 
     return { sellCount: sells.length, refundCount: refunds.length, itemCount, spent, returned, net: spent - returned, cashback, top }
 }
@@ -119,7 +119,7 @@ function formatSummary(s) {
     const lines = [
         `📊 <b>История покупок</b>`,
         ``,
-        `🧾 Покупок: <b>${s.sellCount}</b> (товаров: ${s.itemsCount})`,
+        `🧾 Покупок: <b>${s.sellCount}</b> (товаров: ${s.itemCount})`,
         `🔄 Возвратов: <b>${s.refundCount}</b>`,
         `💰 Потрачено: <b>${money(s.spent)}</b>`,
     ];

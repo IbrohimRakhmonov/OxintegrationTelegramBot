@@ -10,13 +10,21 @@ const oxClient = axios.create({
   },
 });
 
+// Последние 9 цифр — номер без кода страны, чтобы +998 90… и 90… совпадали
+const phoneKey = (phone = '') => String(phone).replace(/\D/g, '').slice(-9);
+
 // Найти клиента в OX по номеру телефона
 async function findCustomerByPhone(phone) {
   const normalizedPhone = phone.replace(/\D/g, '');
   const response = await oxClient.get('/customers', {
     params: { q: normalizedPhone },
   });
-  return response.data?.items?.[0] || null;
+
+  // Поиск q неточный (может найти номер по частичному совпадению),
+  // поэтому берём только клиента, у которого номер совпадает полностью
+  const key = phoneKey(normalizedPhone);
+  const items = response.data?.items ?? [];
+  return items.find((c) => (c.profile?.phoneNumbers ?? []).some((p) => phoneKey(p) === key)) || null;
 }
 
 async function getSale(saleId) {
