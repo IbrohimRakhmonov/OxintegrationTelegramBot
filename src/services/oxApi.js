@@ -4,10 +4,24 @@ const MAX_PAGES = 20;
 
 const oxClient = axios.create({
   baseURL: process.env.OX_API_URL || 'https://sparfume.ox-sys.com',
+  timeout: 8000,
   headers: {
     'auth-token': process.env.OX_TOKEN,
     'Content-Type': 'application/json',
   },
+});
+
+// OX иногда «зависает» на отдельном запросе, а повторный проходит за доли секунды.
+// Поэтому при таймауте или 5xx один раз повторяем GET-запрос.
+oxClient.interceptors.response.use(null, async (err) => {
+  const cfg = err.config;
+  const status = err.response?.status;
+  const retriable = err.code === 'ECONNABORTED' || err.code === 'ECONNRESET' || status >= 500;
+  if (!cfg || cfg.method !== 'get' || cfg._retried || !retriable) throw err;
+
+  cfg._retried = true;
+  console.warn(`⚠️ OX ${cfg.url}: ${err.message}, повторяем запрос`);
+  return oxClient(cfg);
 });
 
 // Последние 9 цифр — номер без кода страны, чтобы +998 90… и 90… совпадали
@@ -104,10 +118,17 @@ async function getCustomerOrders(oxUserId) {
   return { items, totalCount: items.length };
 }
 
-// Получить баланс кешбека клиента
+// Получить баланс кешбека клиента: в OX он лежит в кошельке клиента (wallet.bonus)
 async function getCashbackBalance(oxUserId) {
-  const response = await oxClient.get(`/customers/${oxUserId}/cashback`);
-  return response.data?.data || { balance: 0, currency: 'UZS' };
+  const response = await oxClient.get('/customers', {
+    params: { 'id[]': oxUserId }
+  });
+  const wallet = response.data?.items?.[0]?.wallet;
+  return {
+    balance: wallet?.bonus?.UZS ?? 0,
+    cash: wallet?.cash?.UZS ?? 0,
+    currency: 'UZS',
+  };
 }
 
 module.exports = { findCustomerByPhone, getCustomerOrders, getCashbackBalance, getSale, getCustomer, getProduct };

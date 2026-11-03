@@ -47,4 +47,8 @@ async function markSaleProcessed(saleId) {
   return rowCount > 0;
 }
 
-module.exports = { findUserByTelegramId, createUser, authorizeUser, findUserByOxId, markSaleProcessed };
+async function unmarkSaleProcessed(saleId) {
+  await pool.query('DELETE FROM processed_sales WHERE sale_id = $1', [saleId]);
+}
+
+module.exports = { findUserByTelegramId, createUser, authorizeUser, findUserByOxId, markSaleProcessed, unmarkSaleProcessed };

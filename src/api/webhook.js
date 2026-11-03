@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
-const { findUserByOxId, markSaleProcessed } = require('../services/userService');
+const { findUserByOxId, markSaleProcessed, unmarkSaleProcessed } = require('../services/userService');
 const { getSale } = require('../services/oxApi');
 const bot = require('../bot/index')
 
@@ -38,11 +38,28 @@ router.post('/ox/:secret', async (req, res) => {
       return;
     }
 
-    await handleOxEvent(saleId);
+    await withRetry(() => handleOxEvent(saleId), saleId);
   } catch (err) {
-    console.error('Webhook handler error:', err.message);
+    // Не удалось — снимаем отметку, чтобы повторный вебхук по этой продаже снова обработался
+    await unmarkSaleProcessed(saleId).catch(() => {});
+    console.error(`Webhook handler error (продажа #${saleId}):`, err.message);
   }
 });
+
+// Временные сбои OX/Telegram (502, 504, таймауты) — повторяем через 3, 10 и 30 секунд
+const RETRY_DELAYS = [3000, 10000, 30000];
+
+async function withRetry(fn, saleId) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= RETRY_DELAYS.length) throw err;
+      console.warn(`⚠️ Продажа #${saleId}: ${err.message}, повтор через ${RETRY_DELAYS[attempt] / 1000} с`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]));
+    }
+  }
+}
 
 
 async function handleOxEvent(saleId) {
