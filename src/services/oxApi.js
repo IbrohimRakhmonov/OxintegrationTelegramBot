@@ -105,10 +105,17 @@ async function getCustomerOrders(oxUserId) {
   return { items, totalCount: items.length };
 }
 
-// Получить баланс кешбека клиента
+// Получить баланс кешбека клиента: в OX он лежит в кошельке клиента (wallet.bonus)
 async function getCashbackBalance(oxUserId) {
-  const response = await oxClient.get(`/customers/${oxUserId}/cashback`);
-  return response.data?.data || { balance: 0, currency: 'UZS' };
+  const response = await oxClient.get('/customers', {
+    params: { 'id[]': oxUserId }
+  });
+  const wallet = response.data?.items?.[0]?.wallet;
+  return {
+    balance: wallet?.bonus?.UZS ?? 0,
+    cash: wallet?.cash?.UZS ?? 0,
+    currency: 'UZS',
+  };
 }
 
 module.exports = { findCustomerByPhone, getCustomerOrders, getCashbackBalance, getSale, getCustomer, getProduct };

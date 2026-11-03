@@ -126,7 +126,9 @@ bot.action('cashback', async (ctx) => {
 
     ctx.reply(
       `💰 *Ваш кешбек:*\n\n` +
-      `Баланс: *${formatAmount(cashback.balance)}*\n\n` +
+      `Баланс: *${formatAmount(cashback.balance)}*\n` +
+      (cashback.cash ? `Депозит: *${formatAmount(cashback.cash)}*\n` : '') +
+      `\n` +
       `Кешбек начисляется с каждой покупки и может быть использован при следующем заказе.`,
       { parse_mode: 'Markdown', ...mainMenu() }
     );
