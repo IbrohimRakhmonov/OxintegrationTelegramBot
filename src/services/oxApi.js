@@ -131,4 +131,62 @@ async function getCashbackBalance(oxUserId) {
   };
 }
 
-module.exports = { findCustomerByPhone, getCustomerOrders, getCashbackBalance, getSale, getCustomer, getProduct };
+// ─── ДЛЯ РАССЫЛКИ ─────────────────────────────────────────────────────────────
+
+// Сколько клиентов запрашиваем у OX за один раз
+const CUSTOMERS_BATCH = 50;
+
+// Загрузить сразу нескольких клиентов: GET /customers?id[]=1&id[]=2...
+// По умолчанию OX отдаёт 20 записей на страницу, поэтому передаём size и,
+// если OX всё равно вернул меньше, догружаем следующие страницы.
+async function getCustomersByIds(ids) {
+  const result = [];
+  for (let i = 0; i < ids.length; i += CUSTOMERS_BATCH) {
+    const batch = ids.slice(i, i + CUSTOMERS_BATCH);
+    let received = 0;
+    for (let page = 1; page <= 10; page++) {
+      const response = await oxClient.get('/customers', {
+        params: { 'id[]': batch, size: batch.length, page },
+      });
+      const items = response.data?.items ?? [];
+      const total = Number(response.data?.total_count ?? items.length);
+      result.push(...items);
+      received += items.length;
+      if (items.length === 0 || received >= total) break;
+    }
+  }
+  return result;
+}
+
+// Название группы полей, где OX хранит регион клиента
+const REGION_GROUP_NAME = 'Все клиенты по Регионам';
+
+const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+// Регион клиента: fieldGroups → группа «Все клиенты по Регионам» → первое непустое value.
+// Нет группы или поле пустое — возвращаем null (такой клиент получает рекламу всегда).
+function extractRegion(customer) {
+  const groups = Array.isArray(customer?.fieldGroups) ? customer.fieldGroups : [];
+  const group = groups.find((g) => norm(g?.name).toLowerCase() === REGION_GROUP_NAME.toLowerCase());
+  if (!group) return null;
+
+  for (const field of group.fields ?? []) {
+    let value = field?.value;
+    // На случай, если значение придёт объектом (поле-список)
+    if (value && typeof value === 'object') value = value.name ?? value.title ?? value.value;
+    const text = norm(value);
+    if (text) return text;
+  }
+  return null;
+}
+
+// Пол клиента: 'male' / 'female' или null, если не указан
+function extractGender(customer) {
+  const g = String(customer?.profile?.gender ?? '').toLowerCase().trim();
+  return g === 'male' || g === 'female' ? g : null;
+}
+
+module.exports = {
+  findCustomerByPhone, getCustomerOrders, getCashbackBalance, getSale, getCustomer, getProduct,
+  getCustomersByIds, extractRegion, extractGender,
+};
