@@ -35,9 +35,27 @@ async function start() {
     bot.launch();
     console.log('🤖 Telegram bot started');
 
+    // 4. Бот рекламной рассылки — только если задан его токен.
+    //    Ошибки внутри него не роняют основного бота.
+    let adminBot = null;
+    if (process.env.ADMIN_BOT_TOKEN) {
+      try {
+        const { startAdminBot } = require('./adminBot');
+        adminBot = startAdminBot();
+      } catch (err) {
+        console.error('❌ Бот рассылки не запустился:', err.message);
+      }
+    }
+
     // Graceful shutdown
-    process.once('SIGINT', () => bot.stop('SIGINT'));
-    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+    const stop = (signal) => {
+      // stop() бросает ошибку, если бот не успел запуститься — это не страшно
+      for (const b of [bot, adminBot]) {
+        try { if (b) b.stop(signal); } catch {}
+      }
+    };
+    process.once('SIGINT', () => stop('SIGINT'));
+    process.once('SIGTERM', () => stop('SIGTERM'));
 
   } catch (err) {
     console.error('Startup error:', err);
