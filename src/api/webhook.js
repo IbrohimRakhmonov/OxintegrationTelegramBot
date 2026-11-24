@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const { findUserByOxId, markSaleProcessed, unmarkSaleProcessed } = require('../services/userService');
-const { getSale } = require('../services/oxApi');
+const { getSale, getCashbackBalance } = require('../services/oxApi');
 const bot = require('../bot/index')
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
@@ -90,11 +90,26 @@ async function handleOxEvent(saleId) {
     sale.sellTotal?.UZS ??
     records.reduce((sum, r) => sum + Number(r.total?.UZS ?? 0), 0);
 
-  const msg =
+  // Кешбэк, начисленный за эту покупку: OX хранит его в каждой позиции чека
+  const earnedCashback = records.reduce((sum, r) => sum + Number(r.cashback?.bonus?.UZS ?? 0), 0);
+
+  // Общий баланс кешбэка — если OX не ответил, уведомление всё равно отправляем, без этой строки
+  let cashbackBalance = null;
+  try {
+    cashbackBalance = (await getCashbackBalance(sale.customer)).balance;
+  } catch (err) {
+    console.warn(`⚠️ Не удалось получить баланс кешбэка клиента ${sale.customer}:`, err.message);
+  }
+
+  let msg =
     `🛒 <b>Новый заказ оформлен!</b>\n\n` +
     `📦 Заказ #${sale.printKey || sale.id}\n` +
     `💵 Сумма: ${formatAmount(total)}\n\n` +
-    `🧴 Товары:\n${productList || '—'}`;
+    `🧴 Товары:\n${productList || '—'}\n\n` +
+    `🎁 Кешбэк за покупку: <b>+${formatAmount(earnedCashback)}</b>`;
+  if (cashbackBalance !== null) {
+    msg += `\n💰 Баланс кешбэка: <b>${formatAmount(cashbackBalance)}</b>`;
+  }
 
   await bot.telegram.sendMessage(user.telegram_id, msg, { parse_mode: 'HTML' });
   console.log(`✅ Уведомление о заказе #${sale.id} отправлено клиенту ${sale.customer}`);
